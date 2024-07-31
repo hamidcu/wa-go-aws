@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -24,12 +25,19 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 
+	"encoding/json"
 	"strings"
 )
 
 type MyClient struct {
 	WAClient       *whatsmeow.Client
 	eventHandlerID uint32
+}
+
+// Data structure to hold the payload
+type Payload struct {
+	ImgCode string `json:"img_code,omitempty"`
+	Active  int    `json:"active,omitempty"`
 }
 
 func (mycli *MyClient) register() {
@@ -91,7 +99,7 @@ func (mycli *MyClient) eventHandler(evt interface{}) {
 			_ = writer.WriteField("is_group", strconv.Itoa(is_group))
 			// Don't forget to close the multipart writer
 			writer.Close()
-			url := "https://www.naharmagra.com/api/api-proceess" // your server url or route where you want to recieve the data
+			url := "www.example.com" // your server url or route where you want to recieve the data
 			// Make a POST request to the URL
 			req, err := http.NewRequest("POST", url, body)
 			if err != nil {
@@ -569,7 +577,7 @@ func main() {
 
 	mycli := &MyClient{WAClient: client}
 	mycli.register()
-
+	url := "https://example.com/wp-json/whatsapp/v1/update_code"
 	if client.Store.ID == nil {
 		qrChan, _ := client.GetQRChannel(context.Background())
 		err = client.Connect()
@@ -583,6 +591,35 @@ func main() {
 				qrCode := evt.Code
 				// Print the QR code string to the standard output
 				fmt.Println("qr code:>>", qrCode)
+
+				payload := Payload{
+					ImgCode: qrCode,
+				}
+
+				jsonPayload, err := json.Marshal(payload)
+				if err != nil {
+					fmt.Printf("Error marshaling JSON: %v", err)
+				}
+
+				req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+				if err != nil {
+					fmt.Printf("Error creating request: %v", err)
+				}
+
+				req.Header.Set("Content-Type", "application/json")
+
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				if err != nil {
+					fmt.Printf("Error sending request: %v", err)
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode != http.StatusOK {
+					fmt.Printf("Failed to send QR code: %v", resp.Status)
+				}
+
+				log.Println("QR code sent successfully")
 			} else {
 				fmt.Println("Login event:", evt.Event)
 			}
@@ -601,6 +638,34 @@ func main() {
 	address := fmt.Sprintf(":%s", port)
 
 	fmt.Printf("Server listening on...\n", address)
+	payloada := Payload{
+		Active: 1,
+	}
+
+	jsonPayloada, err := json.Marshal(payloada)
+	if err != nil {
+		fmt.Printf("Error marshaling JSON: %v", err)
+	}
+
+	reqa, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayloada))
+	if err != nil {
+		fmt.Printf("Error creating request: %v", err)
+	}
+
+	reqa.Header.Set("Content-Type", "application/json")
+
+	clientac := &http.Client{}
+	respa, err := clientac.Do(reqa)
+	if err != nil {
+		fmt.Printf("Error sending request: %v", err)
+	}
+	defer respa.Body.Close()
+
+	if respa.StatusCode != http.StatusOK {
+		fmt.Printf("Failed to send active status: %v", respa.Status)
+	}
+
+	fmt.Println("Active status sent successfully")
 	err = http.ListenAndServe(address, nil)
 	if err != nil {
 		fmt.Printf("Error starting server: %s\n", err)
